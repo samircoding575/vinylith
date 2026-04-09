@@ -36,6 +36,11 @@ yarn-error.log*
 # vercel
 .vercel
 
+# transformers.js model cache
+.cache/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+.vercel
