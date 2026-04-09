@@ -41,8 +41,9 @@ export const usersRouter = createTRPCRouter({
           name: input.name,
           email: input.email,
           passwordHash,
+          role: "pending", // requires admin approval before borrowing
         })
         .returning();
-      return { id: created.id, email: created.email, name: created.name };
+      return { id: created.id, email: created.email, name: created.name, role: created.role };
     }),
 });

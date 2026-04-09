@@ -6,11 +6,11 @@ declare module "next-auth" {
       id: string;
       email: string;
       name?: string | null;
-      role: "member" | "librarian" | "admin";
+      role: "pending" | "member" | "librarian" | "admin" | "deactivated";
     };
   }
   interface User {
-    role?: "member" | "librarian" | "admin";
+    role?: "pending" | "member" | "librarian" | "admin" | "deactivated";
   }
 }
 

@@ -16,7 +16,12 @@ export function Navbar() {
     { href: "/search", label: "AI Search" },
     ...(session ? [{ href: "/dashboard", label: "Dashboard" }] : []),
     ...(isLibrarian ? [{ href: "/items/new", label: "Add item" }] : []),
-    ...(isAdmin ? [{ href: "/admin/settings", label: "⚙ Admin" }] : []),
+    ...(isAdmin
+      ? [
+          { href: "/admin/settings", label: "⚙ Settings" },
+          { href: "/admin/users", label: "Users" },
+        ]
+      : []),
   ];
 
   return (

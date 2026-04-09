@@ -22,17 +22,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           .where(eq(users.email, creds.email as string))
           .limit(1);
         if (!user) return null;
-        const ok = await bcrypt.compare(
-          creds.password as string,
-          user.passwordHash
-        );
+        const ok = await bcrypt.compare(creds.password as string, user.passwordHash);
         if (!ok) return null;
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          role: user.role,
-        };
+        // Deactivated accounts cannot sign in
+        if (user.role === "deactivated") return null;
+        return { id: user.id, email: user.email, name: user.name, role: user.role };
       },
     }),
   ],

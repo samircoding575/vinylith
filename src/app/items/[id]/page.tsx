@@ -6,6 +6,7 @@ import { useSession } from "next-auth/react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { ItemDetailSkeleton } from "@/components/skeletons";
+import Link from "next/link";
 
 export default function ItemDetailPage({
   params,
@@ -22,6 +23,10 @@ export default function ItemDetailPage({
   const { data: history } = api.items.conditionHistory.useQuery({
     itemId: id,
   });
+  const { data: waitlistData } = api.waitlist.forItem.useQuery({ itemId: id });
+  const { data: myWaitlist } = api.waitlist.mine.useQuery(undefined, {
+    enabled: !!session,
+  });
 
   const checkout = api.borrowings.checkout.useMutation({
     onSuccess: () => {
@@ -31,6 +36,28 @@ export default function ItemDetailPage({
     },
     onError: (e) => toast.error(e.message || "Checkout failed"),
   });
+
+  const joinWaitlist = api.waitlist.join.useMutation({
+    onSuccess: () => {
+      toast.success("Added to waitlist! You'll be notified when it's available.");
+      utils.waitlist.forItem.invalidate({ itemId: id });
+      utils.waitlist.mine.invalidate();
+    },
+    onError: (e) => toast.error(e.message || "Could not join waitlist"),
+  });
+
+  const leaveWaitlist = api.waitlist.leave.useMutation({
+    onSuccess: () => {
+      toast.info("Removed from waitlist.");
+      utils.waitlist.forItem.invalidate({ itemId: id });
+      utils.waitlist.mine.invalidate();
+    },
+    onError: (e) => toast.error(e.message || "Could not leave waitlist"),
+  });
+
+  const myEntry = myWaitlist?.find((e) => e.item.id === id);
+  const myPosition = myEntry?.position ?? null;
+  const queueLength = waitlistData?.length ?? 0;
 
   const isLibrarian =
     session?.user?.role === "librarian" || session?.user?.role === "admin";
@@ -99,13 +126,49 @@ export default function ItemDetailPage({
                   : "Check out"}
               </button>
             ) : (
-              <div className="rounded-full bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300 px-6 py-3 inline-block">
-                Currently checked out
-                {availability?.borrowing &&
-                  ` · due ${format(
-                    new Date(availability.borrowing.dueAt),
-                    "MMM d, yyyy"
-                  )}`}
+              <div className="space-y-3">
+                <div className="rounded-full bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300 px-6 py-3 inline-block text-sm">
+                  Checked out
+                  {availability?.borrowing &&
+                    ` · due ${format(
+                      new Date(availability.borrowing.dueAt),
+                      "MMM d, yyyy"
+                    )}`}
+                  {queueLength > 0 && ` · ${queueLength} in queue`}
+                </div>
+                {!session ? (
+                  <div>
+                    <Link
+                      href="/login"
+                      className="rounded-full border border-neutral-300 dark:border-neutral-700 px-6 py-3 text-sm inline-block hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                    >
+                      Sign in to join waitlist
+                    </Link>
+                  </div>
+                ) : myEntry ? (
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <span className="rounded-full bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300 px-4 py-2 text-sm">
+                      You&apos;re #{myPosition ?? "?"} in queue
+                    </span>
+                    <button
+                      onClick={() =>
+                        leaveWaitlist.mutate({ itemId: id })
+                      }
+                      disabled={leaveWaitlist.isPending}
+                      className="rounded-full border border-neutral-300 dark:border-neutral-700 px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-neutral-800 disabled:opacity-50"
+                    >
+                      {leaveWaitlist.isPending ? "Leaving…" : "Leave waitlist"}
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => joinWaitlist.mutate({ itemId: id })}
+                    disabled={joinWaitlist.isPending}
+                    className="rounded-full bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 px-6 py-3 text-sm font-medium disabled:opacity-50"
+                  >
+                    {joinWaitlist.isPending ? "Joining…" : "Join waitlist"}
+                  </button>
+                )}
               </div>
             )}
           </div>

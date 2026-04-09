@@ -10,7 +10,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
-export const roleEnum = pgEnum("role", ["member", "librarian", "admin"]);
+export const roleEnum = pgEnum("role", ["pending", "member", "librarian", "admin", "deactivated"]);
 export const itemTypeEnum = pgEnum("item_type", [
   "book",
   "toy",
@@ -82,6 +82,16 @@ export const lateFees = pgTable("late_fees", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// ── Waitlist ───────────────────────────────────────────────────────────────────
+export const waitlist = pgTable("waitlist", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  itemId: uuid("item_id").notNull().references(() => items.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  joinedAt: timestamp("joined_at").defaultNow().notNull(),
+  notifiedAt: timestamp("notified_at"),   // set when we email them "it's available"
+  fulfilledAt: timestamp("fulfilled_at"), // set when they actually borrow it
+});
+
 // ── Password reset tokens ──────────────────────────────────────────────────────
 export const passwordResetTokens = pgTable("password_reset_tokens", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -131,6 +141,11 @@ export const lateFeesRelations = relations(lateFees, ({ one }) => ({
   user: one(users, { fields: [lateFees.userId], references: [users.id] }),
 }));
 
+export const waitlistRelations = relations(waitlist, ({ one }) => ({
+  item: one(items, { fields: [waitlist.itemId], references: [items.id] }),
+  user: one(users, { fields: [waitlist.userId], references: [users.id] }),
+}));
+
 // ── Types ──────────────────────────────────────────────────────────────────────
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
@@ -140,3 +155,4 @@ export type Borrowing = typeof borrowings.$inferSelect;
 export type ConditionLog = typeof conditionLogs.$inferSelect;
 export type LateFee = typeof lateFees.$inferSelect;
 export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
+export type WaitlistEntry = typeof waitlist.$inferSelect;

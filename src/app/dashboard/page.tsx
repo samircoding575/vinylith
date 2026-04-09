@@ -54,6 +54,17 @@ function DashboardInner() {
     undefined,
     { enabled: !!session }
   );
+  const { data: myWaitlist } = api.waitlist.mine.useQuery(undefined, {
+    enabled: !!session,
+  });
+
+  const leaveWaitlist = api.waitlist.leave.useMutation({
+    onSuccess: () => {
+      toast.info("Removed from waitlist.");
+      utils.waitlist.mine.invalidate();
+    },
+    onError: (e) => toast.error(e.message || "Could not leave waitlist"),
+  });
 
   const returnItem = api.borrowings.returnItem.useMutation({
     onSuccess: (res) => {
@@ -170,6 +181,41 @@ function DashboardInner() {
           })}
         </div>
       </section>
+
+      {/* Waitlist */}
+      {(myWaitlist?.length ?? 0) > 0 && (
+        <section className="mt-12">
+          <h2 className="text-xl font-semibold">Your waitlist</h2>
+          <div className="mt-4 space-y-2">
+            {myWaitlist!.map(({ entry, item, position }) => (
+              <div
+                key={entry.id}
+                className="rounded-2xl border border-amber-200 dark:border-amber-800 bg-white dark:bg-neutral-900 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+              >
+                <div>
+                  <Link
+                    href={`/items/${item.id}`}
+                    className="font-medium hover:text-amber-600"
+                  >
+                    {item.title}
+                  </Link>
+                  <div className="text-sm text-amber-600 dark:text-amber-400 mt-0.5">
+                    Position #{position} in queue
+                    {entry.notifiedAt && " · Available now — claim it!"}
+                  </div>
+                </div>
+                <button
+                  onClick={() => leaveWaitlist.mutate({ itemId: item.id })}
+                  disabled={leaveWaitlist.isPending}
+                  className="rounded-full border border-neutral-300 dark:border-neutral-700 px-4 py-1.5 text-sm hover:bg-neutral-100 dark:hover:bg-neutral-800 disabled:opacity-50 shrink-0"
+                >
+                  Leave queue
+                </button>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Borrowing history */}
       {past.length > 0 && (

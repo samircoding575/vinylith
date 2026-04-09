@@ -2,23 +2,38 @@
 
 import { useState } from "react";
 import { api } from "@/trpc/react";
-import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { toast } from "sonner";
 
 export default function RegisterPage() {
-  const router = useRouter();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [done, setDone] = useState(false);
   const register = api.users.register.useMutation({
-    onSuccess: async () => {
-      toast.success("Account created — welcome!");
-      await signIn("credentials", { email, password, redirect: false });
-      router.push("/dashboard");
-    },
+    onSuccess: () => setDone(true),
     onError: (e) => toast.error(e.message || "Registration failed"),
   });
+
+  if (done) {
+    return (
+      <div className="mx-auto max-w-sm px-6 py-20 text-center">
+        <div className="text-5xl mb-4">📬</div>
+        <h1 className="text-2xl font-bold tracking-tight">Account created!</h1>
+        <p className="text-neutral-500 mt-3">
+          Your membership is <span className="font-medium text-amber-600 dark:text-amber-400">pending approval</span>.
+          An admin will review and activate your account shortly.
+          You&apos;ll be able to sign in once approved.
+        </p>
+        <Link
+          href="/login"
+          className="mt-6 inline-block rounded-full bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 px-6 py-3 font-medium"
+        >
+          Go to sign in
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-sm px-6 py-20">

@@ -1,10 +1,36 @@
 import { z } from "zod";
-import { and, desc, eq, isNull, lt } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, lt } from "drizzle-orm";
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "@/server/trpc";
-import { borrowings, items, users, lateFees } from "@/server/db/schema";
+import { borrowings, items, users, lateFees, waitlist } from "@/server/db/schema";
 import { TRPCError } from "@trpc/server";
-import { sendBorrowConfirmation } from "@/server/email";
+import { sendBorrowConfirmation, sendDueReminder } from "@/server/email";
 import { calcLateFee } from "@/server/stripe";
+import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
+import type * as schema from "@/server/db/schema";
+
+async function notifyWaitlistNext(
+  db: PostgresJsDatabase<typeof schema>,
+  itemId: string
+) {
+  const [next] = await db
+    .select({ entry: waitlist, user: users, item: items })
+    .from(waitlist)
+    .innerJoin(users, eq(waitlist.userId, users.id))
+    .innerJoin(items, eq(waitlist.itemId, items.id))
+    .where(and(eq(waitlist.itemId, itemId), isNull(waitlist.fulfilledAt), isNull(waitlist.notifiedAt)))
+    .orderBy(asc(waitlist.joinedAt))
+    .limit(1);
+  if (!next) return;
+  await db.update(waitlist).set({ notifiedAt: new Date() }).where(eq(waitlist.id, next.entry.id));
+  await sendDueReminder({
+    to: next.user.email,
+    userId: next.user.id,
+    userName: next.user.name,
+    itemTitle: next.item.title,
+    dueAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), // 3-day window to claim
+    daysLeft: 3,
+  });
+}
 
 const DEFAULT_BORROW_DAYS = 14;
 
@@ -52,6 +78,15 @@ export const borrowingsRouter = createTRPCRouter({
     .input(z.object({ itemId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.session.user.id as string;
+
+      // Block pending/deactivated accounts
+      const [currentUser] = await ctx.db.select().from(users).where(eq(users.id, userId)).limit(1);
+      if (currentUser?.role === "pending") {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Your membership is pending approval. An admin will activate your account shortly.",
+        });
+      }
 
       // Block if user has any unpaid late fees
       const [unpaidFee] = await ctx.db
@@ -153,6 +188,9 @@ export const borrowingsRouter = createTRPCRouter({
           amountCents: feeCents,
         });
       }
+
+      // Notify next person on the waitlist (fire-and-forget)
+      notifyWaitlistNext(ctx.db, borrowing.itemId).catch(console.error);
 
       return { ...updated, lateFee: feeCents > 0 ? feeCents : null };
     }),
