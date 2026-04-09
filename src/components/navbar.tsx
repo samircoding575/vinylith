@@ -9,12 +9,14 @@ export function Navbar() {
   const [open, setOpen] = useState(false);
   const isLibrarian =
     session?.user?.role === "librarian" || session?.user?.role === "admin";
+  const isAdmin = session?.user?.role === "admin";
 
   const links = [
     { href: "/items", label: "Catalog" },
     { href: "/search", label: "AI Search" },
     ...(session ? [{ href: "/dashboard", label: "Dashboard" }] : []),
     ...(isLibrarian ? [{ href: "/items/new", label: "Add item" }] : []),
+    ...(isAdmin ? [{ href: "/admin/settings", label: "⚙ Admin" }] : []),
   ];
 
   return (

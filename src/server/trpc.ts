@@ -43,3 +43,11 @@ export const librarianProcedure = protectedProcedure.use(({ ctx, next }) => {
   }
   return next();
 });
+
+export const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
+  const role = (ctx.session.user as { role?: string }).role;
+  if (role !== "admin") {
+    throw new TRPCError({ code: "FORBIDDEN", message: "Admin access required" });
+  }
+  return next();
+});
